@@ -2,11 +2,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define MASTER 0
+#define N 4
+#define INF 9999
 
-int main(int argc, char **argv[])
+int main(int argc, char **argv)
 {
+	int graph[N][N] = {
+		0,   INF, 9,   INF,
+		4,   0,   3,   INF,
+		INF, INF, 0,   2,
+		INF, 1,   INF, 0
+	};
+
 	int numprocs, rc, procid;
-	int values[2];
 	MPI_Status status;
 	rc = MPI_Init(&argc, &argv);
 
@@ -18,30 +26,29 @@ int main(int argc, char **argv[])
 	MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
 
-	if (procid == MASTER) {
-		int nr = rand() % 100; 
-		int i;
-		int number = nr;
-		int procLeader = 0;
-		for (i = 1; i < numprocs; i++) {
-			MPI_Recv(&values, 2, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-			if (values[1]>number)
-			{
-				number = values[1];
-				procLeader = i;
-			}
-			else if ((values[1] == number) && (i>procLeader))
-			{
-				procLeader = i;
-			}
+	for (int k=0; k<N; k++)
+	{
+		for (int j=0; j<N; j++)
+		{
+			if (graph[procid][k] + graph[k][j] < graph[procid][j])
+				graph[procid][j] = graph[procid][k] + graph[k][j];
 		}
-		MPI_Send(&values, 2, MPI_INT, 0, 0, MPI_COMM_WORLD);
+
+		MPI_Allgather(graph[procid], N, MPI_INT, graph, N, MPI_INT, MPI_COMM_WORLD);
+		
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
-	else {
-		int nr = rand() % 100;
-		values[0] = procid;
-		values[1] = nr;
-		MPI_Send(&values, 2, MPI_INT, 0, 1, MPI_COMM_WORLD);
+
+	if (procid == 0)
+	{
+		for (int i=0; i<N; i++)
+		{
+			for (int j=0; j<N; j++)
+			{
+				printf("%d ",graph[i][j]);
+			}
+			printf("\n");
+		}
 	}
 	MPI_Finalize();
 	return 0;
